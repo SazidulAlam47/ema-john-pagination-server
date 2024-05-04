@@ -29,11 +29,30 @@ async function run() {
     await client.connect();
 
     const productCollection = client.db('emaJohnDB').collection('products');
+    const cartCollection = client.db('emaJohnDB').collection('cart');
 
     app.get('/products', async (req, res) => {
       const page = parseInt(req.query?.page);
       const size = parseInt(req.query?.size);
-      const result = await productCollection.find()
+      const sortType = req.query?.sort;
+      const searchTerm = req.query?.search;
+
+      const query = {
+        // price: {
+        //   $lt: 50
+        // }
+        name: {
+          $regex: searchTerm || '',
+          $options: 'i'
+        }
+      };
+      const options = {
+        sort: {
+          price: sortType === 'acc' ? 1 : -1,
+        }
+      };
+
+      const result = await productCollection.find(query, options)
         .skip(page * size)
         .limit(size)
         .toArray();
@@ -55,6 +74,31 @@ async function run() {
     app.get("/productsCount", async (req, res) => {
       const count = await productCollection.estimatedDocumentCount();
       res.send({ count });
+    });
+
+    app.get("/cart", async (req, res) => {
+      const result = await cartCollection.find().toArray();
+      res.send(result);
+    });
+
+    app.post("/cart", async (req, res) => {
+      const product = req.body;
+      console.log(product);
+      const result = await cartCollection.insertOne(product);
+      res.send(result);
+    });
+
+    app.delete("/cart/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await cartCollection.deleteOne(query);
+      res.send(result);
+    });
+
+    app.delete("/cart", async (req, res) => {
+      const query = {};
+      const result = await cartCollection.deleteMany(query);
+      res.send(result);
     });
 
     // Send a ping to confirm a successful connection
